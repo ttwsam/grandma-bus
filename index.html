@@ -76,13 +76,13 @@ body{
   padding:0 2px;
 }
 .page-title-zh{
-  font-size:15px;
+  font-size:clamp(15px, 2.1dvh, 19px);
   font-weight:700;
   margin:0;
   line-height:1.25;
 }
 .page-title-en{
-  font-size:11px;
+  font-size:clamp(11px, 1.55dvh, 13px);
   font-weight:500;
   color:var(--muted);
   margin:0;
@@ -94,9 +94,9 @@ body{
   gap:6px;
   margin-top:5px;
 }
-.location-row svg{flex:none;width:15px;height:15px;color:var(--accent-30);}
+.location-row svg{flex:none;width:clamp(15px, 2dvh, 17px);height:clamp(15px, 2dvh, 17px);color:var(--accent-30);}
 .location-row span{
-  font-size:12.5px;
+  font-size:clamp(12.5px, 1.7dvh, 14px);
   font-weight:500;
   color:var(--muted);
   min-width:0;
@@ -127,13 +127,13 @@ body{
 }
 .route-badge{
   flex:none;
-  width:44px;
-  height:44px;
+  width:clamp(44px, 6dvh, 52px);
+  height:clamp(44px, 6dvh, 52px);
   border-radius:50%;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:15px;
+  font-size:clamp(15px, 2dvh, 17px);
   font-weight:900;
   color:#fff;
   font-variant-numeric:tabular-nums;
@@ -142,14 +142,14 @@ body{
 .route-badge.r51A{background:var(--accent-51a);}
 .panel-location{min-width:0;}
 .stop-name{
-  font-size:15px;
+  font-size:clamp(15px, 2dvh, 17px);
   font-weight:700;
   margin:0 0 1px 0;
   line-height:1.2;
   text-wrap:balance;
 }
 .stop-meta{
-  font-size:11.5px;
+  font-size:clamp(11.5px, 1.55dvh, 12.5px);
   color:var(--muted);
   margin:0;
   line-height:1.2;
@@ -165,14 +165,14 @@ body{
 .time-tile{
   flex:none;
   scroll-snap-align:start;
-  min-width:72px;
+  min-width:clamp(72px, 10dvh, 86px);
   background:var(--tile-bg);
   border-radius:13px;
   padding:9px 6px;
   text-align:center;
 }
 .tile-mins{
-  font-size:26px;
+  font-size:clamp(26px, 3.7dvh, 32px);
   font-weight:900;
   line-height:1;
   font-variant-numeric:tabular-nums;
@@ -181,13 +181,13 @@ body{
 .tile-mins.soon{color:var(--good);}
 .tile-mins .unit{
   display:block;
-  font-size:10.5px;
+  font-size:clamp(10.5px, 1.4dvh, 12px);
   font-weight:500;
   color:var(--muted);
   margin-top:2px;
 }
 .tile-clock{
-  font-size:11px;
+  font-size:clamp(11px, 1.5dvh, 13px);
   color:var(--muted);
   margin:5px 0 0 0;
   font-variant-numeric:tabular-nums;
@@ -195,7 +195,7 @@ body{
 }
 .panel-state{
   padding:10px 0 4px 0;
-  font-size:13px;
+  font-size:clamp(13px, 1.75dvh, 14.5px);
   color:var(--muted);
   text-align:center;
 }
@@ -217,7 +217,7 @@ body{
   padding-top:0;
 }
 .status-line{
-  font-size:10.5px;
+  font-size:clamp(10.5px, 1.4dvh, 12px);
   color:var(--muted);
   text-align:center;
 }
@@ -232,7 +232,7 @@ body{
   border:none;
   border-radius:13px;
   padding:12px 16px;
-  font-size:15.5px;
+  font-size:clamp(15.5px, 2.1dvh, 17px);
   font-weight:700;
   font-family:inherit;
   cursor:pointer;
@@ -308,18 +308,22 @@ body{
 
   var ROUTES = ['30', '51A'];
   var API_KEY = 'fd6090cc-eb13-46f8-86c3-2c4ffb0ee3e6';
-  // 511.org's API doesn't send CORS headers for calls from another host,
-  // so requests are relayed through a public CORS proxy if the direct
-  // call fails. Fine for a personal, low-traffic app.
-  var PROXY_PREFIX = 'https://api.allorigins.win/raw?url=';
+  // Confirmed live (via direct browser fetch, Nov 2026): api.511.org's
+  // StopMonitoring endpoint sends proper CORS headers, so no proxy is
+  // needed for it. An earlier version of this page routed failed calls
+  // through a public CORS proxy (api.allorigins.win) as a fallback --
+  // that proxy turned out to be extremely slow/unreliable (19s+, often
+  // failing outright) and was the main cause of multi-second load times.
+  // Removed entirely: a failed direct call now just shows the "can't
+  // connect" message right away instead of hanging on a bad proxy.
 
   // 511.org's default API key limit is 60 requests/hour (confirmed via
-  // their open-data FAQ). Each refresh cycle calls once per DISTINCT
-  // stop needed (usually 2: one per route, occasionally 1 if both
-  // routes share a stop). At 150s between refreshes that's at most
-  // 24 cycles/hour x 2 = 48 requests/hour, leaving headroom under the
-  // limit for manual "刷新位置" taps too. Do not drop this much below
-  // 150000 without also re-checking the math.
+  // their open-data FAQ). Each refresh cycle calls StopMonitoring once
+  // per DISTINCT stop needed (usually 2: one per route, occasionally 1
+  // if both routes share a stop). At 150s between refreshes that's at
+  // most 24 cycles/hour x 2 = 48 requests/hour, leaving headroom under
+  // the limit for manual "刷新位置" taps too. Do not drop this much
+  // below 150000 without also re-checking the math.
   var REFRESH_MS = 150000;
 
   // ---- TEST OVERRIDE ---------------------------------------------------
@@ -328,7 +332,7 @@ body{
   // is what should be live on her actual phone.
   var TEST_LOCATION_OVERRIDE = null;
 
-  var state = { entries: null, timer: null, timetableCache: {} };
+  var state = { entries: null, timer: null };
 
   var els = {
     locationText: document.getElementById('locationText'),
@@ -428,79 +432,75 @@ body{
     return out;
   }
 
-  // ---- Scheduled timetable (backfill beyond live tracking) ------------
-  // StopMonitoring only shows buses currently out on the road, which is
-  // often just 1-2 per route. To show up to 6, and to roll into
-  // tomorrow's first buses once today's service has ended, we also pull
-  // 511's separate scheduled-timetable feed (SIRI ST) for the same stop,
-  // covering a 20-hour window from now so one call usually reaches past
-  // midnight into tomorrow's early trips. This is fetched once per stop
-  // per page load (cached), not on every auto-refresh, so it adds only
-  // a couple of one-time requests rather than recurring ones.
-  function extractTimetableVisits(data){
-    var siri = data.Siri || data;
-    var sd = siri.ServiceDelivery || {};
-    var std = sd.StopTimetableDelivery;
-    if (Array.isArray(std)) std = std[0];
-    if (!std) return [];
-    var visits = std.TimetabledStopVisit;
-    if (!visits) return [];
-    return Array.isArray(visits) ? visits : [visits];
+  // ---- Scheduled backfill (beyond live tracking) -----------------------
+  // StopMonitoring only reports buses currently out on the road -- often
+  // just 1-2 per route, especially in the evening. To show up to 8, and
+  // to roll into tomorrow once today's service ends, we backfill with
+  // the real published schedule.
+  //
+  // We tried 511.org's live "stoptimetable" API for this first, but it
+  // turned out to be broken server-side: every request to it returns
+  // HTTP 412 ("Precondition set by the client failed"), even using the
+  // exact example from 511's own API spec PDF -- confirmed by testing
+  // directly in a browser. Falling back to a public CORS proxy when
+  // that failed was *also* what caused the 19+ second load times (the
+  // proxy is extremely slow and often fails outright). Both are gone.
+  //
+  // Instead, the schedule below was extracted ONCE from AC Transit's
+  // own published GTFS feed (api.511.org/transit/datafeeds, operator
+  // AC) on 2026-11-13, for exactly these 4 stops and 2 routes --
+  // combining calendar.txt (which days each trip runs) with
+  // stop_times.txt (the actual stop-level arrival times, not just the
+  // handful of "timepoints" the live timetable API exposes). It is
+  // static data baked into the page, so showing it costs zero extra
+  // network requests and zero extra load time.
+  //
+  // SCHEDULE[stopId][routeId] is an array of 7 day-arrays, indexed like
+  // JS Date.getDay() (0=Sun ... 6=Sat), each holding that day's sorted
+  // "HH:MM" arrival times (hours may run to "24:xx" etc. for trips after
+  // midnight). The current GTFS booking period runs 2026-08-09 through
+  // 2027-04-03; AC Transit typically republishes a few times a year, so
+  // this table should be regenerated from a fresh GTFS feed after that
+  // date, or sooner if a user reports it looking off versus the posted
+  // AC Transit schedule.
+  var SCHEDULE = {"50237":{"30":[["05:33","06:03","06:33","07:06","07:36","08:06","08:40","09:10","09:40","10:18","10:52","11:22","11:51","12:21","12:52","13:22","13:52","14:20","14:51","15:21","15:51","16:21","16:52","17:22","17:51","18:21","18:51","19:18","19:44","20:14","20:44","21:09","21:37"],["06:01","06:31","07:01","07:31","08:01","08:45","09:15","09:45","10:14","10:44","11:14","11:44","12:14","12:46","13:16","13:46","14:18","14:48","15:18","15:51","16:21","16:51","17:21","17:51","18:21","18:45","19:15","19:42","20:12","20:42","21:05","21:33","22:03"],["06:01","06:31","07:01","07:31","08:01","08:45","09:15","09:45","10:14","10:44","11:14","11:44","12:14","12:46","13:16","13:46","14:18","14:48","15:18","15:51","16:21","16:51","17:21","17:51","18:21","18:45","19:15","19:42","20:12","20:42","21:05","21:33","22:03"],["06:01","06:31","07:01","07:31","08:01","08:45","09:15","09:45","10:14","10:44","11:14","11:44","12:14","12:46","13:16","13:46","14:18","14:48","15:18","15:51","16:21","16:51","17:21","17:51","18:21","18:45","19:15","19:42","20:12","20:42","21:05","21:33","22:03"],["06:01","06:31","07:01","07:31","08:01","08:45","09:15","09:45","10:14","10:44","11:14","11:44","12:14","12:46","13:16","13:46","14:18","14:48","15:18","15:51","16:21","16:51","17:21","17:51","18:21","18:45","19:15","19:42","20:12","20:42","21:05","21:33","22:03"],["06:01","06:31","07:01","07:31","08:01","08:45","09:15","09:45","10:14","10:44","11:14","11:44","12:14","12:46","13:16","13:46","14:18","14:48","15:18","15:51","16:21","16:51","17:21","17:51","18:21","18:45","19:15","19:42","20:12","20:42","21:05","21:33","22:03"],["05:33","06:03","06:33","07:06","07:36","08:06","08:40","09:10","09:40","10:18","10:52","11:22","11:51","12:21","12:52","13:22","13:52","14:20","14:51","15:21","15:51","16:21","16:52","17:22","17:51","18:21","18:51","19:18","19:44","20:14","20:44","21:09","21:37"]]},"50300":{"30":[["05:19","05:49","06:19","06:51","07:21","07:51","08:23","08:53","09:23","09:59","10:31","11:01","11:30","12:00","12:32","13:02","13:32","14:02","14:31","15:01","15:31","16:01","16:32","17:02","17:31","18:01","18:31","18:58","19:24","19:54","20:24","20:51","21:20"],["05:41","06:11","06:41","07:11","07:41","08:20","08:50","09:20","09:52","10:22","10:52","11:22","11:52","12:24","12:54","13:24","13:55","14:25","14:55","15:27","15:57","16:27","16:57","17:27","17:57","18:23","18:53","19:21","19:51","20:21","20:47","21:17","21:47"],["05:41","06:11","06:41","07:11","07:41","08:20","08:50","09:20","09:52","10:22","10:52","11:22","11:52","12:24","12:54","13:24","13:55","14:25","14:55","15:27","15:57","16:27","16:57","17:27","17:57","18:23","18:53","19:21","19:51","20:21","20:47","21:17","21:47"],["05:41","06:11","06:41","07:11","07:41","08:20","08:50","09:20","09:52","10:22","10:52","11:22","11:52","12:24","12:54","13:24","13:55","14:25","14:55","15:27","15:57","16:27","16:57","17:27","17:57","18:23","18:53","19:21","19:51","20:21","20:47","21:17","21:47"],["05:41","06:11","06:41","07:11","07:41","08:20","08:50","09:20","09:52","10:22","10:52","11:22","11:52","12:24","12:54","13:24","13:55","14:25","14:55","15:27","15:57","16:27","16:57","17:27","17:57","18:23","18:53","19:21","19:51","20:21","20:47","21:17","21:47"],["05:41","06:11","06:41","07:11","07:41","08:20","08:50","09:20","09:52","10:22","10:52","11:22","11:52","12:24","12:54","13:24","13:55","14:25","14:55","15:27","15:57","16:27","16:57","17:27","17:57","18:23","18:53","19:21","19:51","20:21","20:47","21:17","21:47"],["05:19","05:49","06:19","06:51","07:21","07:51","08:23","08:53","09:23","09:59","10:31","11:01","11:30","12:00","12:32","13:02","13:32","14:02","14:31","15:01","15:31","16:01","16:32","17:02","17:31","18:01","18:31","18:58","19:24","19:54","20:24","20:51","21:20"]]},"51478":{"30":[["05:28","05:58","06:28","07:01","07:31","08:01","08:34","09:04","09:34","10:12","10:45","11:15","11:44","12:14","12:45","13:15","13:45","14:13","14:44","15:14","15:44","16:14","16:45","17:15","17:44","18:14","18:44","19:11","19:37","20:07","20:37","21:02","21:31"],["05:54","06:24","06:54","07:24","07:54","08:34","09:04","09:34","10:06","10:36","11:06","11:36","12:06","12:38","13:08","13:38","14:10","14:40","15:10","15:43","16:13","16:43","17:13","17:43","18:13","18:37","19:07","19:35","20:05","20:35","20:59","21:27","21:57"],["05:54","06:24","06:54","07:24","07:54","08:34","09:04","09:34","10:06","10:36","11:06","11:36","12:06","12:38","13:08","13:38","14:10","14:40","15:10","15:43","16:13","16:43","17:13","17:43","18:13","18:37","19:07","19:35","20:05","20:35","20:59","21:27","21:57"],["05:54","06:24","06:54","07:24","07:54","08:34","09:04","09:34","10:06","10:36","11:06","11:36","12:06","12:38","13:08","13:38","14:10","14:40","15:10","15:43","16:13","16:43","17:13","17:43","18:13","18:37","19:07","19:35","20:05","20:35","20:59","21:27","21:57"],["05:54","06:24","06:54","07:24","07:54","08:34","09:04","09:34","10:06","10:36","11:06","11:36","12:06","12:38","13:08","13:38","14:10","14:40","15:10","15:43","16:13","16:43","17:13","17:43","18:13","18:37","19:07","19:35","20:05","20:35","20:59","21:27","21:57"],["05:54","06:24","06:54","07:24","07:54","08:34","09:04","09:34","10:06","10:36","11:06","11:36","12:06","12:38","13:08","13:38","14:10","14:40","15:10","15:43","16:13","16:43","17:13","17:43","18:13","18:37","19:07","19:35","20:05","20:35","20:59","21:27","21:57"],["05:28","05:58","06:28","07:01","07:31","08:01","08:34","09:04","09:34","10:12","10:45","11:15","11:44","12:14","12:45","13:15","13:45","14:13","14:44","15:14","15:44","16:14","16:45","17:15","17:44","18:14","18:44","19:11","19:37","20:07","20:37","21:02","21:31"]],"51A":[["05:55","06:15","06:35","06:55","07:15","07:35","07:58","08:18","08:33","08:48","09:03","09:18","09:33","09:49","10:04","10:19","10:34","10:50","11:05","11:20","11:35","11:50","12:05","12:20","12:35","12:50","13:05","13:20","13:35","13:50","14:05","14:20","14:35","14:50","15:05","15:20","15:35","15:50","16:05","16:20","16:35","16:50","17:05","17:20","17:35","17:50","18:05","18:20","18:35","18:46","19:01","19:16","19:31","19:46","20:06","20:24","20:44","21:04","21:24","21:44","22:04","22:34","23:04","23:34","24:04"],["05:15","05:30","05:45","06:00","06:15","06:33","06:48","07:04","07:19","07:33","07:45","07:59","08:09","08:23","08:35","08:47","08:57","09:09","09:21","09:33","09:45","09:57","10:09","10:21","10:33","10:45","10:57","11:09","11:21","11:33","11:45","11:57","12:09","12:21","12:33","12:45","12:57","13:09","13:21","13:33","13:45","13:57","14:09","14:21","14:33","14:45","14:57","15:09","15:22","15:34","15:44","15:54","16:06","16:18","16:30","16:42","16:54","17:06","17:18","17:30","17:41","17:53","18:05","18:17","18:29","18:41","18:53","19:05","19:17","19:27","19:39","19:51","20:04","20:19","20:31","20:46","21:01","21:21","21:41","22:01","22:21","22:41","23:01","23:21","23:41","24:01","24:21"],["05:15","05:30","05:45","06:00","06:15","06:33","06:48","07:04","07:19","07:33","07:45","07:59","08:09","08:23","08:35","08:47","08:57","09:09","09:21","09:33","09:45","09:57","10:09","10:21","10:33","10:45","10:57","11:09","11:21","11:33","11:45","11:57","12:09","12:21","12:33","12:45","12:57","13:09","13:21","13:33","13:45","13:57","14:09","14:21","14:33","14:45","14:57","15:09","15:22","15:34","15:44","15:54","16:06","16:18","16:30","16:42","16:54","17:06","17:18","17:30","17:41","17:53","18:05","18:17","18:29","18:41","18:53","19:05","19:17","19:27","19:39","19:51","20:04","20:19","20:31","20:46","21:01","21:21","21:41","22:01","22:21","22:41","23:01","23:21","23:41","24:01","24:21"],["05:15","05:30","05:45","06:00","06:15","06:33","06:48","07:04","07:19","07:33","07:45","07:59","08:09","08:23","08:35","08:47","08:57","09:09","09:21","09:33","09:45","09:57","10:09","10:21","10:33","10:45","10:57","11:09","11:21","11:33","11:45","11:57","12:09","12:21","12:33","12:45","12:57","13:09","13:21","13:33","13:45","13:57","14:09","14:21","14:33","14:45","14:57","15:09","15:22","15:34","15:44","15:54","16:06","16:18","16:30","16:42","16:54","17:06","17:18","17:30","17:41","17:53","18:05","18:17","18:29","18:41","18:53","19:05","19:17","19:27","19:39","19:51","20:04","20:19","20:31","20:46","21:01","21:21","21:41","22:01","22:21","22:41","23:01","23:21","23:41","24:01","24:21"],["05:15","05:30","05:45","06:00","06:15","06:33","06:48","07:04","07:19","07:33","07:45","07:59","08:09","08:23","08:35","08:47","08:57","09:09","09:21","09:33","09:45","09:57","10:09","10:21","10:33","10:45","10:57","11:09","11:21","11:33","11:45","11:57","12:09","12:21","12:33","12:45","12:57","13:09","13:21","13:33","13:45","13:57","14:09","14:21","14:33","14:45","14:57","15:09","15:22","15:34","15:44","15:54","16:06","16:18","16:30","16:42","16:54","17:06","17:18","17:30","17:41","17:53","18:05","18:17","18:29","18:41","18:53","19:05","19:17","19:27","19:39","19:51","20:04","20:19","20:31","20:46","21:01","21:21","21:41","22:01","22:21","22:41","23:01","23:21","23:41","24:01","24:21"],["05:15","05:30","05:45","06:00","06:15","06:33","06:48","07:04","07:19","07:33","07:45","07:59","08:09","08:23","08:35","08:47","08:57","09:09","09:21","09:33","09:45","09:57","10:09","10:21","10:33","10:45","10:57","11:09","11:21","11:33","11:45","11:57","12:09","12:21","12:33","12:45","12:57","13:09","13:21","13:33","13:45","13:57","14:09","14:21","14:33","14:45","14:57","15:09","15:22","15:34","15:44","15:54","16:06","16:18","16:30","16:42","16:54","17:06","17:18","17:30","17:41","17:53","18:05","18:17","18:29","18:41","18:53","19:05","19:17","19:27","19:39","19:51","20:04","20:19","20:31","20:46","21:01","21:21","21:41","22:01","22:21","22:41","23:01","23:21","23:41","24:01","24:21"],["05:54","06:14","06:34","06:54","07:14","07:34","07:58","08:18","08:33","08:48","09:03","09:19","09:34","09:49","10:04","10:19","10:34","10:49","11:04","11:20","11:35","11:50","12:05","12:20","12:35","12:50","13:05","13:20","13:35","13:50","14:05","14:20","14:35","14:50","15:05","15:20","15:35","15:50","16:05","16:20","16:35","16:50","17:05","17:20","17:35","17:49","18:04","18:19","18:34","18:49","19:04","19:19","19:34","19:49","20:08","20:28","20:48","21:08","21:28","21:45","22:05","22:35","23:05","23:35","24:05"]]},"52969":{"30":[["05:23","05:53","06:23","06:56","07:26","07:56","08:28","08:58","09:28","10:06","10:38","11:08","11:37","12:07","12:39","13:09","13:39","14:07","14:38","15:08","15:38","16:08","16:39","17:09","17:38","18:08","18:38","19:05","19:31","20:01","20:31","20:56","21:25"],["05:48","06:18","06:48","07:18","07:48","08:27","08:57","09:27","10:00","10:30","11:00","11:30","12:00","12:31","13:01","13:31","14:03","14:33","15:03","15:35","16:05","16:35","17:05","17:35","18:05","18:31","19:01","19:29","19:59","20:29","20:53","21:22","21:52"],["05:48","06:18","06:48","07:18","07:48","08:27","08:57","09:27","10:00","10:30","11:00","11:30","12:00","12:31","13:01","13:31","14:03","14:33","15:03","15:35","16:05","16:35","17:05","17:35","18:05","18:31","19:01","19:29","19:59","20:29","20:53","21:22","21:52"],["05:48","06:18","06:48","07:18","07:48","08:27","08:57","09:27","10:00","10:30","11:00","11:30","12:00","12:31","13:01","13:31","14:03","14:33","15:03","15:35","16:05","16:35","17:05","17:35","18:05","18:31","19:01","19:29","19:59","20:29","20:53","21:22","21:52"],["05:48","06:18","06:48","07:18","07:48","08:27","08:57","09:27","10:00","10:30","11:00","11:30","12:00","12:31","13:01","13:31","14:03","14:33","15:03","15:35","16:05","16:35","17:05","17:35","18:05","18:31","19:01","19:29","19:59","20:29","20:53","21:22","21:52"],["05:48","06:18","06:48","07:18","07:48","08:27","08:57","09:27","10:00","10:30","11:00","11:30","12:00","12:31","13:01","13:31","14:03","14:33","15:03","15:35","16:05","16:35","17:05","17:35","18:05","18:31","19:01","19:29","19:59","20:29","20:53","21:22","21:52"],["05:23","05:53","06:23","06:56","07:26","07:56","08:28","08:58","09:28","10:06","10:38","11:08","11:37","12:07","12:39","13:09","13:39","14:07","14:38","15:08","15:38","16:08","16:39","17:09","17:38","18:08","18:38","19:05","19:31","20:01","20:31","20:56","21:25"]]}};
+
+  // Builds a Date for an "HH:MM" schedule time (HH may run past 23 for
+  // post-midnight trips) anchored to a given calendar day.
+  function scheduleTimeToDate(baseDate, hhmm){
+    var parts = hhmm.split(':');
+    var d = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
+    d.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+    return d;
   }
 
-  function parseTimetable(data){
-    var visits = extractTimetableVisits(data);
+  // Returns {line, time}[] of this stop+route's scheduled arrivals for
+  // the given calendar day (today or tomorrow), future ones only when
+  // onlyFuture is true.
+  function scheduledArrivalsForDay(stopId, route, dayDate, onlyFuture){
+    var routeTable = SCHEDULE[stopId] && SCHEDULE[stopId][route];
+    if (!routeTable) return [];
+    var dayTimes = routeTable[dayDate.getDay()] || [];
     var now = Date.now();
     var out = [];
-    visits.forEach(function(v){
-      var tvj = v.TargetedVehicleJourney || {};
-      var line = fieldValue(tvj.LineRef) || fieldValue(tvj.PublishedLineName);
-      line = String(line).trim();
-      if (ROUTES.indexOf(line) === -1) return;
-      var call = tvj.TargetedCall || {};
-      var when = call.AimedArrivalTime || call.AimedDepartureTime;
-      if (!when) return;
-      var t = new Date(when).getTime();
-      if (isNaN(t) || t < now - 60000) return;
-      out.push({ line: line, time: t });
+    dayTimes.forEach(function(hhmm){
+      var t = scheduleTimeToDate(dayDate, hhmm).getTime();
+      if (onlyFuture && t < now) return;
+      out.push({ line: route, time: t });
     });
-    out.sort(function(a,b){ return a.time - b.time; });
     return out;
   }
 
-  function fetchStopTimetable(stopId){
-    var now = new Date();
-    var end = new Date(now.getTime() + 20 * 3600 * 1000);
-    var apiUrl = 'https://api.511.org/transit/stoptimetable?api_key=' + API_KEY +
-              '&MonitoringRef=' + stopId + '&OperatorRef=AC' +
-              '&StartTime=' + encodeURIComponent(now.toISOString()) +
-              '&EndTime=' + encodeURIComponent(end.toISOString()) +
-              '&format=json';
-    return requestOnce(apiUrl)
-      .catch(function(){
-        return requestOnce(PROXY_PREFIX + encodeURIComponent(apiUrl));
-      })
-      .then(function(text){
-        var clean = text.replace(/^﻿/, '');
-        return parseTimetable(JSON.parse(clean));
-      });
-  }
-
-  // Cached per stop for the whole page session — never re-fetched on
-  // the 150s auto-refresh, only on a genuine cache miss (first load, or
-  // a newly-nearest stop she hasn't been at yet this session).
-  function ensureTimetable(stopId){
-    if (state.timetableCache[stopId]) return state.timetableCache[stopId];
-    var p = fetchStopTimetable(stopId).catch(function(){ return []; });
-    state.timetableCache[stopId] = p;
-    return p;
-  }
-
   // Combines live tracking (near-term, most accurate) with the
-  // scheduled backfill (for the 3rd-6th tile, and tomorrow's first
+  // scheduled backfill (for the 3rd-8th tile, and tomorrow's first
   // buses once today's are exhausted). Scheduled entries too close to
   // the last live one are dropped as likely the same trip.
-  function mergeArrivals(live, scheduled){
+  function mergeArrivals(live, stopId, route){
+    var today = new Date();
+    var tomorrow = new Date(today.getTime() + 24 * 3600 * 1000);
+    var scheduled = scheduledArrivalsForDay(stopId, route, today, true)
+      .concat(scheduledArrivalsForDay(stopId, route, tomorrow, false));
+
     var combined = live.slice();
     var cutoff = combined.length ? combined[combined.length - 1].time : Date.now();
     scheduled.forEach(function(item){
@@ -513,8 +513,9 @@ body{
         deduped.push(item);
       }
     });
-    return deduped.slice(0, 6);
+    return deduped.slice(0, 8);
   }
+
 
   function requestOnce(url){
     return fetch(url).then(function(r){
@@ -526,10 +527,9 @@ body{
   function fetchStopVisits(stopId){
     var apiUrl = 'https://api.511.org/transit/StopMonitoring?api_key=' + API_KEY +
               '&agency=AC&stopCode=' + stopId + '&format=json';
+    // Direct call only -- confirmed 511.org sends proper CORS headers for
+    // this endpoint, so no proxy fallback is needed (see note above).
     return requestOnce(apiUrl)
-      .catch(function(){
-        return requestOnce(PROXY_PREFIX + encodeURIComponent(apiUrl));
-      })
       .then(function(text){
         var clean = text.replace(/^﻿/, '');
         return parseArrivals(JSON.parse(clean));
@@ -641,22 +641,17 @@ body{
     });
 
     Promise.all(uniqueIds.map(function(id){
-      return Promise.all([
-        fetchStopVisits(id).catch(function(){ return null; }),
-        ensureTimetable(id)
-      ]);
+      return fetchStopVisits(id).catch(function(){ return null; });
     })).then(function(results){
-      var liveCache = {}, schedCache = {};
+      var liveCache = {};
       uniqueIds.forEach(function(id, i){
-        liveCache[id] = results[i][0];
-        schedCache[id] = results[i][1];
+        liveCache[id] = results[i];
       });
 
       entries.forEach(function(entry, idx){
         var liveVisits = liveCache[entry.stop.id];
         var liveFiltered = liveVisits ? liveVisits.filter(function(v){ return v.line === entry.route; }) : [];
-        var schedFiltered = (schedCache[entry.stop.id] || []).filter(function(v){ return v.line === entry.route; });
-        var combined = mergeArrivals(liveFiltered, schedFiltered);
+        var combined = mergeArrivals(liveFiltered, entry.stop.id, entry.route);
 
         if (!combined.length && liveVisits === null){
           renderPanelError(idx);
