@@ -298,14 +298,12 @@ body{
   var REFRESH_MS = 150000;
 
   // ---- TEST OVERRIDE ---------------------------------------------------
-  // For bench-testing only: pretends she is standing at 1121 Shell Gate
-  // Pl (her home) instead of using real GPS. Geocoded directly from the
-  // address via OpenStreetMap, so this one is accurate to the building.
-  // SET BACK TO null before this goes on her actual phone — left on, it
-  // will always show this location regardless of where she really is.
-  var TEST_LOCATION_OVERRIDE = { lat: 37.7635014, lon: -122.2668996 };
+  // Set to a {lat, lon} object to pretend she is standing somewhere
+  // specific (useful for bench-testing). null means use real GPS, which
+  // is what should be live on her actual phone.
+  var TEST_LOCATION_OVERRIDE = null;
 
-  var state = { entries: null, timer: null };
+  var state = { entries: null, timer: null, timetableCache: {} };
 
   var els = {
     locationText: document.getElementById('locationText'),
@@ -398,13 +396,99 @@ body{
       var when = call.ExpectedArrivalTime || call.AimedArrivalTime || call.ExpectedDepartureTime;
       if (!when) return;
       var t = new Date(when).getTime();
-      if (isNaN(t)) return;
-      var mins = Math.round((t - now) / 60000);
-      if (mins < 0) return;
-      out.push({ line: line, mins: mins, time: t });
+      if (isNaN(t) || t < now) return;
+      out.push({ line: line, time: t });
     });
-    out.sort(function(a,b){ return a.mins - b.mins; });
+    out.sort(function(a,b){ return a.time - b.time; });
     return out;
+  }
+
+  // ---- Scheduled timetable (backfill beyond live tracking) ------------
+  // StopMonitoring only shows buses currently out on the road, which is
+  // often just 1-2 per route. To show up to 6, and to roll into
+  // tomorrow's first buses once today's service has ended, we also pull
+  // 511's separate scheduled-timetable feed (SIRI ST) for the same stop,
+  // covering a 20-hour window from now so one call usually reaches past
+  // midnight into tomorrow's early trips. This is fetched once per stop
+  // per page load (cached), not on every auto-refresh, so it adds only
+  // a couple of one-time requests rather than recurring ones.
+  function extractTimetableVisits(data){
+    var siri = data.Siri || data;
+    var sd = siri.ServiceDelivery || {};
+    var std = sd.StopTimetableDelivery;
+    if (Array.isArray(std)) std = std[0];
+    if (!std) return [];
+    var visits = std.TimetabledStopVisit;
+    if (!visits) return [];
+    return Array.isArray(visits) ? visits : [visits];
+  }
+
+  function parseTimetable(data){
+    var visits = extractTimetableVisits(data);
+    var now = Date.now();
+    var out = [];
+    visits.forEach(function(v){
+      var tvj = v.TargetedVehicleJourney || {};
+      var line = fieldValue(tvj.LineRef) || fieldValue(tvj.PublishedLineName);
+      line = String(line).trim();
+      if (ROUTES.indexOf(line) === -1) return;
+      var call = tvj.TargetedCall || {};
+      var when = call.AimedArrivalTime || call.AimedDepartureTime;
+      if (!when) return;
+      var t = new Date(when).getTime();
+      if (isNaN(t) || t < now - 60000) return;
+      out.push({ line: line, time: t });
+    });
+    out.sort(function(a,b){ return a.time - b.time; });
+    return out;
+  }
+
+  function fetchStopTimetable(stopId){
+    var now = new Date();
+    var end = new Date(now.getTime() + 20 * 3600 * 1000);
+    var apiUrl = 'https://api.511.org/transit/stoptimetable?api_key=' + API_KEY +
+              '&MonitoringRef=' + stopId + '&OperatorRef=AC' +
+              '&StartTime=' + encodeURIComponent(now.toISOString()) +
+              '&EndTime=' + encodeURIComponent(end.toISOString()) +
+              '&format=json';
+    return requestOnce(apiUrl)
+      .catch(function(){
+        return requestOnce(PROXY_PREFIX + encodeURIComponent(apiUrl));
+      })
+      .then(function(text){
+        var clean = text.replace(/^﻿/, '');
+        return parseTimetable(JSON.parse(clean));
+      });
+  }
+
+  // Cached per stop for the whole page session — never re-fetched on
+  // the 150s auto-refresh, only on a genuine cache miss (first load, or
+  // a newly-nearest stop she hasn't been at yet this session).
+  function ensureTimetable(stopId){
+    if (state.timetableCache[stopId]) return state.timetableCache[stopId];
+    var p = fetchStopTimetable(stopId).catch(function(){ return []; });
+    state.timetableCache[stopId] = p;
+    return p;
+  }
+
+  // Combines live tracking (near-term, most accurate) with the
+  // scheduled backfill (for the 3rd-6th tile, and tomorrow's first
+  // buses once today's are exhausted). Scheduled entries too close to
+  // the last live one are dropped as likely the same trip.
+  function mergeArrivals(live, scheduled){
+    var combined = live.slice();
+    var cutoff = combined.length ? combined[combined.length - 1].time : Date.now();
+    scheduled.forEach(function(item){
+      if (item.time > cutoff + 60000) combined.push(item);
+    });
+    combined.sort(function(a,b){ return a.time - b.time; });
+    var deduped = [];
+    combined.forEach(function(item){
+      if (!deduped.length || (item.time - deduped[deduped.length - 1].time) > 90000){
+        deduped.push(item);
+      }
+    });
+    return deduped.slice(0, 6);
   }
 
   function requestOnce(url){
@@ -475,16 +559,21 @@ body{
     }
     var row = document.createElement('div');
     row.className = 'times-row';
-    list.slice(0, 8).forEach(function(item){
+    var now = Date.now();
+    var todayStr = new Date(now).toDateString();
+    list.forEach(function(item){
+      var mins = Math.round((item.time - now) / 60000);
+      if (mins < 0) mins = 0;
+
       var tile = document.createElement('div');
       tile.className = 'time-tile';
 
       var minsEl = document.createElement('div');
-      minsEl.className = 'tile-mins' + (item.mins <= 3 ? ' soon' : '');
+      minsEl.className = 'tile-mins' + (mins <= 3 ? ' soon' : '');
       var num = document.createElement('span');
-      num.textContent = item.mins <= 0 ? '进站' : item.mins;
+      num.textContent = mins <= 0 ? '进站' : mins;
       minsEl.appendChild(num);
-      if (item.mins > 0){
+      if (mins > 0){
         var unit = document.createElement('span');
         unit.className = 'unit';
         unit.textContent = '分钟';
@@ -492,9 +581,11 @@ body{
       }
       tile.appendChild(minsEl);
 
+      var isTomorrow = new Date(item.time).toDateString() !== todayStr;
       var clockEl = document.createElement('div');
       clockEl.className = 'tile-clock';
-      clockEl.textContent = new Date(item.time).toLocaleTimeString('zh-CN', { hour: 'numeric', minute: '2-digit' });
+      var clockStr = new Date(item.time).toLocaleTimeString('zh-CN', { hour: 'numeric', minute: '2-digit' });
+      clockEl.textContent = isTomorrow ? ('明天 ' + clockStr) : clockStr;
       tile.appendChild(clockEl);
 
       row.appendChild(tile);
@@ -525,19 +616,28 @@ body{
     });
 
     Promise.all(uniqueIds.map(function(id){
-      return fetchStopVisits(id).catch(function(){ return null; });
+      return Promise.all([
+        fetchStopVisits(id).catch(function(){ return null; }),
+        ensureTimetable(id)
+      ]);
     })).then(function(results){
-      var cache = {};
-      uniqueIds.forEach(function(id, i){ cache[id] = results[i]; });
+      var liveCache = {}, schedCache = {};
+      uniqueIds.forEach(function(id, i){
+        liveCache[id] = results[i][0];
+        schedCache[id] = results[i][1];
+      });
 
       entries.forEach(function(entry, idx){
-        var visits = cache[entry.stop.id];
-        if (visits === null){
+        var liveVisits = liveCache[entry.stop.id];
+        var liveFiltered = liveVisits ? liveVisits.filter(function(v){ return v.line === entry.route; }) : [];
+        var schedFiltered = (schedCache[entry.stop.id] || []).filter(function(v){ return v.line === entry.route; });
+        var combined = mergeArrivals(liveFiltered, schedFiltered);
+
+        if (!combined.length && liveVisits === null){
           renderPanelError(idx);
           return;
         }
-        var filtered = visits.filter(function(v){ return v.line === entry.route; });
-        renderPanelBody(idx, filtered);
+        renderPanelBody(idx, combined);
       });
 
       var now = new Date();
