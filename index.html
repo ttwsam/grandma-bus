@@ -8,15 +8,18 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-/* Layout concept: two always-visible panels, one per route (30 and
-   51A), ordered with whichever is physically closer on top. Each
-   panel carries its own current stop + next three arrivals. A big,
-   clearly-labeled button at the bottom re-checks her location. */
+/* Layout concept: a thin "navigating from <street>" bar up top (live
+   reverse-geocoded from her actual position), then two always-visible
+   route panels (30 and 51A, closest first), each with its stop name
+   and a horizontally scrollable row of big arrival tiles — no vertical
+   list, no destination text, since from home she only ever travels one
+   way. A big labeled button at the bottom re-checks her location. */
 :root{
   --bg:#FAF8F4;
   --fg:#15181D;
   --surface:#FFFFFF;
   --surface-edge:#E4E0D8;
+  --tile-bg:#F3EFE6;
   --muted:#5B6269;
   --accent-30:#0B5FA5;
   --accent-51a:#C8102E;
@@ -29,6 +32,7 @@
     --fg:#F2F1EC;
     --surface:#181C22;
     --surface-edge:#2A2F37;
+    --tile-bg:#20262E;
     --muted:#9AA3AF;
     --accent-30:#5B9BD9;
     --accent-51a:#FF6B6B;
@@ -41,6 +45,7 @@
   --fg:#F2F1EC;
   --surface:#181C22;
   --surface-edge:#2A2F37;
+  --tile-bg:#20262E;
   --muted:#9AA3AF;
   --accent-30:#5B9BD9;
   --accent-51a:#FF6B6B;
@@ -59,41 +64,56 @@ body{
   flex-direction:column;
   padding-left:max(20px, env(safe-area-inset-left, 0px));
   padding-right:max(20px, env(safe-area-inset-right, 0px));
-  padding-block:20px;
-  gap:14px;
+  padding-block:22px;
+  gap:16px;
   overflow-x:hidden;
+}
+.location-bar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:2px 4px;
+}
+.location-bar svg{flex:none;width:24px;height:24px;color:var(--accent-30);}
+.location-bar span{
+  font-size:17px;
+  font-weight:500;
+  color:var(--muted);
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 .panels{
   display:flex;
   flex-direction:column;
-  gap:14px;
+  gap:16px;
 }
 .panel{
   background:var(--surface);
   border:1px solid var(--surface-edge);
-  border-radius:22px;
-  padding:18px 20px;
+  border-radius:24px;
+  padding:20px 20px 18px 20px;
   display:flex;
   flex-direction:column;
-  gap:8px;
+  gap:12px;
 }
 .panel-header{
   display:flex;
   align-items:center;
-  gap:14px;
-  padding-bottom:10px;
+  gap:16px;
+  padding-bottom:12px;
   border-bottom:1px solid var(--surface-edge);
-  margin-bottom:4px;
 }
 .route-badge{
   flex:none;
-  width:58px;
-  height:58px;
+  width:66px;
+  height:66px;
   border-radius:50%;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:20px;
+  font-size:24px;
   font-weight:900;
   color:#fff;
   font-variant-numeric:tabular-nums;
@@ -102,61 +122,64 @@ body{
 .route-badge.r51A{background:var(--accent-51a);}
 .panel-location{min-width:0;}
 .stop-name{
-  font-size:17px;
-  font-weight:600;
-  margin:0 0 2px 0;
+  font-size:21px;
+  font-weight:700;
+  margin:0 0 3px 0;
   line-height:1.3;
   text-wrap:balance;
 }
 .stop-meta{
-  font-size:13px;
+  font-size:15px;
   color:var(--muted);
   margin:0;
   line-height:1.3;
 }
-.arrival-row{
+.times-row{
   display:flex;
-  align-items:center;
-  justify-content:space-between;
   gap:12px;
-  padding:9px 0;
-  border-top:1px solid var(--surface-edge);
+  overflow-x:auto;
+  padding:2px 2px 6px 2px;
+  -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
 }
-.arrival-row:first-child{border-top:none;padding-top:2px;}
-.arrival-dest{
-  font-size:15px;
-  color:var(--muted);
-  flex:1;
-  min-width:0;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-  margin:0;
+.time-tile{
+  flex:none;
+  scroll-snap-align:start;
+  min-width:106px;
+  background:var(--tile-bg);
+  border-radius:18px;
+  padding:16px 10px;
+  text-align:center;
 }
-.arrival-time-block{flex:none;text-align:right;}
-.arrival-mins{
-  font-size:32px;
+.tile-mins{
+  font-size:40px;
   font-weight:900;
   line-height:1;
   font-variant-numeric:tabular-nums;
   margin:0;
 }
-.arrival-mins .unit{font-size:14px;font-weight:500;color:var(--muted);margin-left:3px;}
-.arrival-mins.soon{color:var(--good);}
-.arrival-clock{
-  font-size:13px;
+.tile-mins.soon{color:var(--good);}
+.tile-mins .unit{
+  display:block;
+  font-size:15px;
+  font-weight:500;
   color:var(--muted);
-  margin:2px 0 0 0;
+  margin-top:4px;
+}
+.tile-clock{
+  font-size:15px;
+  color:var(--muted);
+  margin:8px 0 0 0;
   font-variant-numeric:tabular-nums;
 }
 .panel-state{
-  padding:14px 0 6px 0;
-  font-size:15px;
+  padding:16px 0 6px 0;
+  font-size:16px;
   color:var(--muted);
   text-align:center;
 }
 .spinner{
-  width:28px;height:28px;border-radius:50%;
+  width:30px;height:30px;border-radius:50%;
   border:4px solid var(--surface-edge);
   border-top-color:var(--accent-30);
   animation:spin 1s linear infinite;
@@ -187,18 +210,23 @@ body{
   color:#fff;
   border:none;
   border-radius:16px;
-  padding:16px 18px;
-  font-size:18px;
+  padding:17px 18px;
+  font-size:19px;
   font-weight:700;
   font-family:inherit;
   cursor:pointer;
 }
 .refresh-btn:active{transform:scale(0.98);}
-.refresh-btn svg{width:24px;height:24px;flex:none;}
+.refresh-btn svg{width:25px;height:25px;flex:none;}
 .refresh-btn.spinning svg{animation:spin 0.9s linear infinite;}
 </style>
 </head>
 <body>
+
+<div class="location-bar">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.4 4.6 20.3l.9.9L12 18l6.5 3.2.9-.9z"/></svg>
+  <span id="locationText">正在定位…</span>
+</div>
 
 <div class="panels" id="panels">
   <div class="panel">
@@ -225,28 +253,29 @@ body{
   // OpenStreetMap — accurate to the intersection, not hand-estimated.
   // Still worth a field check by standing at each one with the page
   // open, since geocoding can occasionally land on the wrong corner.
+  // "name" is the plain stop name shown in the UI — no nickname prefix.
   var STOPS = [
     {
-      id: '52969',
-      zh: '家 · Otis Dr & Larchmont Isle',
+      id: '52969',           // Home stop
+      name: 'Otis Dr & Larchmont Isle',
       lat: 37.7652424, lon: -122.2677706,
       routes: ['30']
     },
     {
-      id: '51478',
-      zh: '阿拉米達飲茶 · Webster St & Buena Vista Av',
+      id: '51478',           // Alameda dim sum stop
+      name: 'Webster St & Buena Vista Av',
       lat: 37.7770532, lon: -122.2767592,
       routes: ['30', '51A']
     },
     {
-      id: '50237',
-      zh: '奧克蘭華埠 · Harrison St & 8th St',
+      id: '50237',           // Oakland Chinatown stop
+      name: 'Harrison St & 8th St',
       lat: 37.7990508, lon: -122.2699070,
       routes: ['30', '51A']
     },
     {
-      id: '50300',
-      zh: '南岸超市 · South Shore Center & Kohl\'s',
+      id: '50300',           // Trader Joe's / South Shore stop
+      name: 'South Shore Center & Kohl\'s',
       lat: 37.7574566, lon: -122.2513933,
       routes: ['30']
     }
@@ -255,10 +284,18 @@ body{
   var ROUTES = ['30', '51A'];
   var API_KEY = 'fd6090cc-eb13-46f8-86c3-2c4ffb0ee3e6';
   // 511.org's API doesn't send CORS headers for calls from another host,
-  // so requests are relayed through a public CORS proxy. Fine for a
-  // personal, low-traffic app; revisit if it ever proves flaky.
+  // so requests are relayed through a public CORS proxy if the direct
+  // call fails. Fine for a personal, low-traffic app.
   var PROXY_PREFIX = 'https://api.allorigins.win/raw?url=';
-  var REFRESH_MS = 25000;
+
+  // 511.org's default API key limit is 60 requests/hour (confirmed via
+  // their open-data FAQ). Each refresh cycle calls once per DISTINCT
+  // stop needed (usually 2: one per route, occasionally 1 if both
+  // routes share a stop). At 150s between refreshes that's at most
+  // 24 cycles/hour x 2 = 48 requests/hour, leaving headroom under the
+  // limit for manual "刷新位置" taps too. Do not drop this much below
+  // 150000 without also re-checking the math.
+  var REFRESH_MS = 150000;
 
   // ---- TEST OVERRIDE ---------------------------------------------------
   // For bench-testing only: pretends she is standing at 1121 Shell Gate
@@ -271,6 +308,7 @@ body{
   var state = { entries: null, timer: null };
 
   var els = {
+    locationText: document.getElementById('locationText'),
     panels: document.getElementById('panels'),
     statusLine: document.getElementById('statusLine'),
     refreshBtn: document.getElementById('refreshBtn')
@@ -295,6 +333,35 @@ body{
       if (d < bestDist){ bestDist = d; best = s; }
     });
     return { stop: best, distanceM: bestDist };
+  }
+
+  // Reverse-geocodes the viewer's live coordinates to a plain street
+  // name, so the top bar always reflects wherever she actually is
+  // (not just whichever saved stop is nearest).
+  function reverseGeocodeStreet(lat, lon){
+    var url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' +
+              lat + '&lon=' + lon + '&zoom=16&addressdetails=1';
+    return fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(function(r){
+        if (!r.ok) throw new Error('reverse geocode http ' + r.status);
+        return r.json();
+      })
+      .then(function(data){
+        var addr = data.address || {};
+        return addr.road || addr.pedestrian || addr.neighbourhood ||
+               (data.display_name ? data.display_name.split(',')[0] : null);
+      });
+  }
+
+  function updateLocationText(lat, lon){
+    els.locationText.textContent = '正在确认街道…';
+    reverseGeocodeStreet(lat, lon)
+      .then(function(street){
+        els.locationText.textContent = street ? ('从 ' + street + ' 出发') : '位置已更新';
+      })
+      .catch(function(){
+        els.locationText.textContent = '位置已更新';
+      });
   }
 
   function fieldValue(v){
@@ -334,11 +401,7 @@ body{
       if (isNaN(t)) return;
       var mins = Math.round((t - now) / 60000);
       if (mins < 0) return;
-      // DestinationDisplay ("Rockridge BART", "Downtown Oakland") is the
-      // plain label shown on the bus itself; DestinationName is a bare
-      // cross-street address and less recognizable at a glance.
-      var dest = fieldValue(call.DestinationDisplay) || fieldValue(mvj.DestinationName);
-      out.push({ line: line, mins: mins, time: t, dest: dest });
+      out.push({ line: line, mins: mins, time: t });
     });
     out.sort(function(a,b){ return a.mins - b.mins; });
     return out;
@@ -381,7 +444,7 @@ body{
     loc.className = 'panel-location';
     var name = document.createElement('p');
     name.className = 'stop-name';
-    name.textContent = entry.stop.zh;
+    name.textContent = entry.stop.name;
     var meta = document.createElement('p');
     meta.className = 'stop-meta';
     meta.textContent = entry.distanceM > 600
@@ -410,20 +473,14 @@ body{
       body.innerHTML = '<div class="panel-state">暂时没有到站信息</div>';
       return;
     }
-    list.slice(0, 3).forEach(function(item){
-      var row = document.createElement('div');
-      row.className = 'arrival-row';
+    var row = document.createElement('div');
+    row.className = 'times-row';
+    list.slice(0, 8).forEach(function(item){
+      var tile = document.createElement('div');
+      tile.className = 'time-tile';
 
-      var dest = document.createElement('p');
-      dest.className = 'arrival-dest';
-      dest.textContent = item.dest ? ('开往 ' + item.dest) : '';
-      row.appendChild(dest);
-
-      var block = document.createElement('div');
-      block.className = 'arrival-time-block';
-
-      var minsEl = document.createElement('p');
-      minsEl.className = 'arrival-mins' + (item.mins <= 3 ? ' soon' : '');
+      var minsEl = document.createElement('div');
+      minsEl.className = 'tile-mins' + (item.mins <= 3 ? ' soon' : '');
       var num = document.createElement('span');
       num.textContent = item.mins <= 0 ? '进站' : item.mins;
       minsEl.appendChild(num);
@@ -433,16 +490,16 @@ body{
         unit.textContent = '分钟';
         minsEl.appendChild(unit);
       }
-      block.appendChild(minsEl);
+      tile.appendChild(minsEl);
 
-      var clockEl = document.createElement('p');
-      clockEl.className = 'arrival-clock';
+      var clockEl = document.createElement('div');
+      clockEl.className = 'tile-clock';
       clockEl.textContent = new Date(item.time).toLocaleTimeString('zh-CN', { hour: 'numeric', minute: '2-digit' });
-      block.appendChild(clockEl);
+      tile.appendChild(clockEl);
 
-      row.appendChild(block);
-      body.appendChild(row);
+      row.appendChild(tile);
     });
+    body.appendChild(row);
   }
 
   function renderPanelError(idx){
@@ -489,6 +546,8 @@ body{
   }
 
   function startWith(lat, lon){
+    updateLocationText(lat, lon);
+
     var entries = ROUTES.map(function(route){
       var r = nearestStopForRoute(route, lat, lon);
       return { route: route, stop: r.stop, distanceM: r.distanceM };
@@ -509,6 +568,7 @@ body{
 
   function onPositionError(){
     els.statusLine.textContent = '无法获取位置,显示常用的家附近站点';
+    els.locationText.textContent = '显示常用地点';
     startWith(STOPS[0].lat, STOPS[0].lon);
   }
 
