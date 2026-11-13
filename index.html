@@ -321,7 +321,11 @@ body{
     var out = [];
     visits.forEach(function(v){
       var mvj = v.MonitoredVehicleJourney || {};
-      var line = fieldValue(mvj.PublishedLineName) || fieldValue(mvj.LineRef);
+      // LineRef holds the route number ("30", "51A"); PublishedLineName
+      // holds the route's full descriptive name ("Dimond - Fruitvale -
+      // South Shore"), which is never empty and so must not be checked
+      // first or it always wins and nothing ever matches our routes.
+      var line = fieldValue(mvj.LineRef) || fieldValue(mvj.PublishedLineName);
       line = String(line).trim();
       if (ROUTES.indexOf(line) === -1) return;
       var call = mvj.MonitoredCall || {};
@@ -331,7 +335,10 @@ body{
       if (isNaN(t)) return;
       var mins = Math.round((t - now) / 60000);
       if (mins < 0) return;
-      var dest = fieldValue(mvj.DestinationName);
+      // DestinationDisplay ("Rockridge BART", "Downtown Oakland") is the
+      // plain label shown on the bus itself; DestinationName is a bare
+      // cross-street address and less recognizable at a glance.
+      var dest = fieldValue(call.DestinationDisplay) || fieldValue(mvj.DestinationName);
       out.push({ line: line, mins: mins, time: t, dest: dest });
     });
     out.sort(function(a,b){ return a.mins - b.mins; });
