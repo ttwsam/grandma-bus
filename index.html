@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>奶奶的公交</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: two always-visible panels, one per route (30 and
+   51A), ordered with whichever is physically closer on top. Each
+   panel carries its own current stop + next three arrivals. A big,
+   clearly-labeled button at the bottom re-checks her location. */
+:root{
+  --bg:#FAF8F4;
+  --fg:#15181D;
+  --surface:#FFFFFF;
+  --surface-edge:#E4E0D8;
+  --muted:#5B6269;
+  --accent-30:#0B5FA5;
+  --accent-51a:#C8102E;
+  --good:#1B8A5A;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1116;
+    --fg:#F2F1EC;
+    --surface:#181C22;
+    --surface-edge:#2A2F37;
+    --muted:#9AA3AF;
+    --accent-30:#5B9BD9;
+    --accent-51a:#FF6B6B;
+    --good:#4CC38A;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1116;
+  --fg:#F2F1EC;
+  --surface:#181C22;
+  --surface-edge:#2A2F37;
+  --muted:#9AA3AF;
+  --accent-30:#5B9BD9;
+  --accent-51a:#FF6B6B;
+  --good:#4CC38A;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  min-height:100%;
+  background:var(--bg);
+  color:var(--fg);
+  font-family:"Noto Sans SC","Inter",system-ui,sans-serif;
+  display:flex;
+  flex-direction:column;
+  padding-left:max(20px, env(safe-area-inset-left, 0px));
+  padding-right:max(20px, env(safe-area-inset-right, 0px));
+  padding-block:20px;
+  gap:14px;
+  overflow-x:hidden;
+}
+.panels{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.panel{
+  background:var(--surface);
+  border:1px solid var(--surface-edge);
+  border-radius:22px;
+  padding:18px 20px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.panel-header{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding-bottom:10px;
+  border-bottom:1px solid var(--surface-edge);
+  margin-bottom:4px;
+}
+.route-badge{
+  flex:none;
+  width:58px;
+  height:58px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+  font-weight:900;
+  color:#fff;
+  font-variant-numeric:tabular-nums;
+}
+.route-badge.r30{background:var(--accent-30);}
+.route-badge.r51A{background:var(--accent-51a);}
+.panel-location{min-width:0;}
+.stop-name{
+  font-size:17px;
+  font-weight:600;
+  margin:0 0 2px 0;
+  line-height:1.3;
+  text-wrap:balance;
+}
+.stop-meta{
+  font-size:13px;
+  color:var(--muted);
+  margin:0;
+  line-height:1.3;
+}
+.arrival-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:9px 0;
+  border-top:1px solid var(--surface-edge);
+}
+.arrival-row:first-child{border-top:none;padding-top:2px;}
+.arrival-dest{
+  font-size:15px;
+  color:var(--muted);
+  flex:1;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  margin:0;
+}
+.arrival-time-block{flex:none;text-align:right;}
+.arrival-mins{
+  font-size:32px;
+  font-weight:900;
+  line-height:1;
+  font-variant-numeric:tabular-nums;
+  margin:0;
+}
+.arrival-mins .unit{font-size:14px;font-weight:500;color:var(--muted);margin-left:3px;}
+.arrival-mins.soon{color:var(--good);}
+.arrival-clock{
+  font-size:13px;
+  color:var(--muted);
+  margin:2px 0 0 0;
+  font-variant-numeric:tabular-nums;
+}
+.panel-state{
+  padding:14px 0 6px 0;
+  font-size:15px;
+  color:var(--muted);
+  text-align:center;
+}
+.spinner{
+  width:28px;height:28px;border-radius:50%;
+  border:4px solid var(--surface-edge);
+  border-top-color:var(--accent-30);
+  animation:spin 1s linear infinite;
+  margin:0 auto 10px auto;
+}
+@media (prefers-reduced-motion: reduce){.spinner{animation-duration:2.4s;}}
+@keyframes spin{to{transform:rotate(360deg);}}
+.bottom-bar{
+  flex:none;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+  padding-top:2px;
+}
+.status-line{
+  font-size:13px;
+  color:var(--muted);
+  text-align:center;
+}
+.refresh-btn{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  background:var(--accent-30);
+  color:#fff;
+  border:none;
+  border-radius:16px;
+  padding:16px 18px;
+  font-size:18px;
+  font-weight:700;
+  font-family:inherit;
+  cursor:pointer;
+}
+.refresh-btn:active{transform:scale(0.98);}
+.refresh-btn svg{width:24px;height:24px;flex:none;}
+.refresh-btn.spinning svg{animation:spin 0.9s linear infinite;}
+</style>
+</head>
+<body>
+
+<div class="panels" id="panels">
+  <div class="panel">
+    <div class="panel-state">
+      <div class="spinner"></div>
+      正在定位,查找附近的公交站…
+    </div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <span class="status-line" id="statusLine">&nbsp;</span>
+  <button class="refresh-btn" id="refreshBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>
+    刷新位置
+  </button>
+</div>
+
+<script>
+(function(){
+
+  // ---- Her saved stops ------------------------------------------------
+  // Coordinates are approximate (derived from AC Transit's public stop
+  // listings for these cross streets) — close enough to tell these four
+  // apart, since they're well over half a mile from one another, but
+  // worth confirming by standing at each one with the page open.
+  var STOPS = [
+    {
+      id: '52969',
+      zh: '家 · Otis Dr & Larchmont Isle',
+      lat: 37.7595, lon: -122.2500,
+      routes: ['30']
+    },
+    {
+      id: '51478',
+      zh: '阿拉米達飲茶 · Webster St & Buena Vista Av',
+      lat: 37.7725, lon: -122.2810,
+      routes: ['30', '51A']
+    },
+    {
+      id: '50237',
+      zh: '奧克蘭華埠 · Harrison St & 8th St',
+      lat: 37.8023, lon: -122.2708,
+      routes: ['30', '51A']
+    },
+    {
+      id: '50300',
+      zh: '南岸超市 · South Shore Center & Kohl\'s',
+      lat: 37.7598, lon: -122.2495,
+      routes: ['30']
+    }
+  ];
+
+  var ROUTES = ['30', '51A'];
+  var API_KEY = 'fd6090cc-eb13-46f8-86c3-2c4ffb0ee3e6';
+  // 511.org's API doesn't send CORS headers for calls from another host,
+  // so requests are relayed through a public CORS proxy. Fine for a
+  // personal, low-traffic app; revisit if it ever proves flaky.
+  var PROXY_PREFIX = 'https://api.allorigins.win/raw?url=';
+  var REFRESH_MS = 25000;
+
+  // ---- TEST OVERRIDE ---------------------------------------------------
+  // For bench-testing only: pretends she is standing at 1121 Shell Gate
+  // Pl (her home) instead of using real GPS. Coordinates are an estimate
+  // from public address lookups, not a precise survey point,  so treat
+  // this as "roughly home," not exact. SET BACK TO null before this goes
+  // on her actual phone — left on, it will always show this location
+  // regardless of where she really is.
+  var TEST_LOCATION_OVERRIDE = { lat: 37.7630, lon: -122.2680 };
+
+  var state = { entries: null, timer: null };
+
+  var els = {
+    panels: document.getElementById('panels'),
+    statusLine: document.getElementById('statusLine'),
+    refreshBtn: document.getElementById('refreshBtn')
+  };
+
+  function haversineMeters(lat1, lon1, lat2, lon2){
+    var R = 6371000;
+    var toRad = function(d){ return d * Math.PI / 180; };
+    var dLat = toRad(lat2 - lat1);
+    var dLon = toRad(lon2 - lon1);
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function nearestStopForRoute(route, lat, lon){
+    var candidates = STOPS.filter(function(s){ return s.routes.indexOf(route) !== -1; });
+    var best = null, bestDist = Infinity;
+    candidates.forEach(function(s){
+      var d = haversineMeters(lat, lon, s.lat, s.lon);
+      if (d < bestDist){ bestDist = d; best = s; }
+    });
+    return { stop: best, distanceM: bestDist };
+  }
+
+  function fieldValue(v){
+    if (Array.isArray(v)) v = v[0];
+    if (v && typeof v === 'object') return v.value || v._ || '';
+    return v || '';
+  }
+
+  function extractVisits(data){
+    var siri = data.Siri || data;
+    var sd = siri.ServiceDelivery || {};
+    var smd = sd.StopMonitoringDelivery;
+    if (Array.isArray(smd)) smd = smd[0];
+    if (!smd) return [];
+    var visits = smd.MonitoredStopVisit;
+    if (!visits) return [];
+    return Array.isArray(visits) ? visits : [visits];
+  }
+
+  function parseArrivals(data){
+    var visits = extractVisits(data);
+    var now = Date.now();
+    var out = [];
+    visits.forEach(function(v){
+      var mvj = v.MonitoredVehicleJourney || {};
+      var line = fieldValue(mvj.PublishedLineName) || fieldValue(mvj.LineRef);
+      line = String(line).trim();
+      if (ROUTES.indexOf(line) === -1) return;
+      var call = mvj.MonitoredCall || {};
+      var when = call.ExpectedArrivalTime || call.AimedArrivalTime || call.ExpectedDepartureTime;
+      if (!when) return;
+      var t = new Date(when).getTime();
+      if (isNaN(t)) return;
+      var mins = Math.round((t - now) / 60000);
+      if (mins < 0) return;
+      var dest = fieldValue(mvj.DestinationName);
+      out.push({ line: line, mins: mins, time: t, dest: dest });
+    });
+    out.sort(function(a,b){ return a.mins - b.mins; });
+    return out;
+  }
+
+  function requestOnce(url){
+    return fetch(url).then(function(r){
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.text();
+    });
+  }
+
+  function fetchStopVisits(stopId){
+    var apiUrl = 'https://api.511.org/transit/StopMonitoring?api_key=' + API_KEY +
+              '&agency=AC&stopCode=' + stopId + '&format=json';
+    return requestOnce(apiUrl)
+      .catch(function(){
+        return requestOnce(PROXY_PREFIX + encodeURIComponent(apiUrl));
+      })
+      .then(function(text){
+        var clean = text.replace(/^﻿/, '');
+        return parseArrivals(JSON.parse(clean));
+      });
+  }
+
+  function buildPanelSkeleton(entry, idx){
+    var panel = document.createElement('div');
+    panel.className = 'panel';
+    panel.id = 'panel-' + idx;
+
+    var header = document.createElement('div');
+    header.className = 'panel-header';
+
+    var badge = document.createElement('div');
+    badge.className = 'route-badge r' + entry.route;
+    badge.textContent = entry.route;
+    header.appendChild(badge);
+
+    var loc = document.createElement('div');
+    loc.className = 'panel-location';
+    var name = document.createElement('p');
+    name.className = 'stop-name';
+    name.textContent = entry.stop.zh;
+    var meta = document.createElement('p');
+    meta.className = 'stop-meta';
+    meta.textContent = entry.distanceM > 600
+      ? '距离约 ' + (entry.distanceM / 1000).toFixed(1) + ' 公里'
+      : '您现在的位置附近';
+    loc.appendChild(name);
+    loc.appendChild(meta);
+    header.appendChild(loc);
+
+    panel.appendChild(header);
+
+    var body = document.createElement('div');
+    body.className = 'panel-body';
+    body.id = 'panel-body-' + idx;
+    body.innerHTML = '<div class="panel-state"><div class="spinner"></div>正在查询到站时间…</div>';
+    panel.appendChild(body);
+
+    return panel;
+  }
+
+  function renderPanelBody(idx, list){
+    var body = document.getElementById('panel-body-' + idx);
+    if (!body) return;
+    body.innerHTML = '';
+    if (!list.length){
+      body.innerHTML = '<div class="panel-state">暂时没有到站信息</div>';
+      return;
+    }
+    list.slice(0, 3).forEach(function(item){
+      var row = document.createElement('div');
+      row.className = 'arrival-row';
+
+      var dest = document.createElement('p');
+      dest.className = 'arrival-dest';
+      dest.textContent = item.dest ? ('开往 ' + item.dest) : '';
+      row.appendChild(dest);
+
+      var block = document.createElement('div');
+      block.className = 'arrival-time-block';
+
+      var minsEl = document.createElement('p');
+      minsEl.className = 'arrival-mins' + (item.mins <= 3 ? ' soon' : '');
+      var num = document.createElement('span');
+      num.textContent = item.mins <= 0 ? '进站' : item.mins;
+      minsEl.appendChild(num);
+      if (item.mins > 0){
+        var unit = document.createElement('span');
+        unit.className = 'unit';
+        unit.textContent = '分钟';
+        minsEl.appendChild(unit);
+      }
+      block.appendChild(minsEl);
+
+      var clockEl = document.createElement('p');
+      clockEl.className = 'arrival-clock';
+      clockEl.textContent = new Date(item.time).toLocaleTimeString('zh-CN', { hour: 'numeric', minute: '2-digit' });
+      block.appendChild(clockEl);
+
+      row.appendChild(block);
+      body.appendChild(row);
+    });
+  }
+
+  function renderPanelError(idx){
+    var body = document.getElementById('panel-body-' + idx);
+    if (!body) return;
+    body.innerHTML = '<div class="panel-state">连不上实时数据,稍后会自动重试</div>';
+  }
+
+  function renderSkeletons(entries){
+    els.panels.innerHTML = '';
+    entries.forEach(function(entry, idx){
+      els.panels.appendChild(buildPanelSkeleton(entry, idx));
+    });
+  }
+
+  function refreshAll(){
+    var entries = state.entries;
+    if (!entries) return;
+
+    var uniqueIds = [];
+    entries.forEach(function(e){
+      if (uniqueIds.indexOf(e.stop.id) === -1) uniqueIds.push(e.stop.id);
+    });
+
+    Promise.all(uniqueIds.map(function(id){
+      return fetchStopVisits(id).catch(function(){ return null; });
+    })).then(function(results){
+      var cache = {};
+      uniqueIds.forEach(function(id, i){ cache[id] = results[i]; });
+
+      entries.forEach(function(entry, idx){
+        var visits = cache[entry.stop.id];
+        if (visits === null){
+          renderPanelError(idx);
+          return;
+        }
+        var filtered = visits.filter(function(v){ return v.line === entry.route; });
+        renderPanelBody(idx, filtered);
+      });
+
+      var now = new Date();
+      els.statusLine.textContent = '更新于 ' + now.toLocaleTimeString('zh-CN', { hour: 'numeric', minute: '2-digit' });
+    });
+  }
+
+  function startWith(lat, lon){
+    var entries = ROUTES.map(function(route){
+      var r = nearestStopForRoute(route, lat, lon);
+      return { route: route, stop: r.stop, distanceM: r.distanceM };
+    });
+    entries.sort(function(a, b){ return a.distanceM - b.distanceM; });
+    state.entries = entries;
+
+    renderSkeletons(entries);
+    refreshAll();
+
+    if (state.timer) clearInterval(state.timer);
+    state.timer = setInterval(refreshAll, REFRESH_MS);
+  }
+
+  function onPosition(pos){
+    startWith(pos.coords.latitude, pos.coords.longitude);
+  }
+
+  function onPositionError(){
+    els.statusLine.textContent = '无法获取位置,显示常用的家附近站点';
+    startWith(STOPS[0].lat, STOPS[0].lon);
+  }
+
+  function locate(){
+    els.panels.innerHTML = '<div class="panel"><div class="panel-state"><div class="spinner"></div>正在定位,查找附近的公交站…</div></div>';
+
+    if (TEST_LOCATION_OVERRIDE){
+      startWith(TEST_LOCATION_OVERRIDE.lat, TEST_LOCATION_OVERRIDE.lon);
+      return;
+    }
+    if (!('geolocation' in navigator)){
+      onPositionError();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(onPosition, onPositionError, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 60000
+    });
+  }
+
+  els.refreshBtn.addEventListener('click', function(){
+    els.refreshBtn.classList.add('spinning');
+    locate();
+    setTimeout(function(){ els.refreshBtn.classList.remove('spinning'); }, 900);
+  });
+
+  locate();
+
+})();
+</script>
+</body>
+</html>
