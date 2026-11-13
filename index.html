@@ -221,33 +221,33 @@ body{
 (function(){
 
   // ---- Her saved stops ------------------------------------------------
-  // Coordinates are approximate (derived from AC Transit's public stop
-  // listings for these cross streets) — close enough to tell these four
-  // apart, since they're well over half a mile from one another, but
-  // worth confirming by standing at each one with the page open.
+  // Coordinates are geocoded directly from each cross street via
+  // OpenStreetMap — accurate to the intersection, not hand-estimated.
+  // Still worth a field check by standing at each one with the page
+  // open, since geocoding can occasionally land on the wrong corner.
   var STOPS = [
     {
       id: '52969',
       zh: '家 · Otis Dr & Larchmont Isle',
-      lat: 37.7595, lon: -122.2500,
+      lat: 37.7652424, lon: -122.2677706,
       routes: ['30']
     },
     {
       id: '51478',
       zh: '阿拉米達飲茶 · Webster St & Buena Vista Av',
-      lat: 37.7725, lon: -122.2810,
+      lat: 37.7770532, lon: -122.2767592,
       routes: ['30', '51A']
     },
     {
       id: '50237',
       zh: '奧克蘭華埠 · Harrison St & 8th St',
-      lat: 37.8023, lon: -122.2708,
+      lat: 37.7990508, lon: -122.2699070,
       routes: ['30', '51A']
     },
     {
       id: '50300',
       zh: '南岸超市 · South Shore Center & Kohl\'s',
-      lat: 37.7598, lon: -122.2495,
+      lat: 37.7574566, lon: -122.2513933,
       routes: ['30']
     }
   ];
@@ -262,12 +262,11 @@ body{
 
   // ---- TEST OVERRIDE ---------------------------------------------------
   // For bench-testing only: pretends she is standing at 1121 Shell Gate
-  // Pl (her home) instead of using real GPS. Coordinates are an estimate
-  // from public address lookups, not a precise survey point,  so treat
-  // this as "roughly home," not exact. SET BACK TO null before this goes
-  // on her actual phone — left on, it will always show this location
-  // regardless of where she really is.
-  var TEST_LOCATION_OVERRIDE = { lat: 37.7630, lon: -122.2680 };
+  // Pl (her home) instead of using real GPS. Geocoded directly from the
+  // address via OpenStreetMap, so this one is accurate to the building.
+  // SET BACK TO null before this goes on her actual phone — left on, it
+  // will always show this location regardless of where she really is.
+  var TEST_LOCATION_OVERRIDE = { lat: 37.7635014, lon: -122.2668996 };
 
   var state = { entries: null, timer: null };
 
